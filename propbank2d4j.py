@@ -10,7 +10,7 @@ from copy import deepcopy
 class probank2d4j:
     'Class to create deeplearning4j (0.3.3.3) training data for RTNT '
 
-    def __init__(self, filename="data.txt", mode=0):
+    def __init__(self, filename="data.txt", mode=0, predicate=True, arguments=True):
         self.instances = propbank.instances()
         self.raw_sentence = []
         self.predicates = []
@@ -19,6 +19,8 @@ class probank2d4j:
         self.x = 0
         self.filename = filename
         self.mode = mode
+        self.predicate = predicate
+        self.arguments = arguments
 
     def findItem(self, activelist, item):
         return [(ind, activelist[ind].index(item)) for ind in xrange(len(activelist)) if item in activelist[ind]]
@@ -54,6 +56,65 @@ class probank2d4j:
         #save the sentence in the file
         with open(self.filename, "a") as text_file:
             text_file.write(sentence + "\n")
+
+    def wordlistFromTree(self,instance):
+        wordlist = []
+        for s in instance.tree.subtrees(lambda t: t.height() == 2):
+            if (s.label() != "-NONE-"):
+                wordlist.append(s.leaves())
+        return wordlist
+
+    def run(self):
+        for i in range(0, 9351):
+            #print the instance number
+            #print i
+            #next instance
+            next_instance = self.instances[i+1]
+            #current instance
+            instance = self.instances[i]
+            #Mode 0: This mode is default, it will be one predicate and argument structure per sentence.
+            if(self.mode==0):
+                print "mode 0"
+                self.raw_sentence = wordlistFromTree(instance)
+                raw_sentence_preflat = deepcopy(self.raw_sentence)
+
+            #Mode 1: Several predicate and argument structures in one sentence which migth overlap
+            elif(self.mode == 1):
+                print "mode 1"
+                if self.x == 0:
+                    self.raw_sentence = wordlistFromTree(instance)
+                    raw_sentence_preflat = deepcopy(self.raw_sentence)
+                    self.x=1
+
+                #save all predicates for one file and their position
+                if(instance.sentnum==next_instance.sentnum):
+                    #add labels for argument spans
+                    self.addArgumentLabel(self.raw_sentence,instance)
+                    #add the predicate/roleset label
+                    self.addPredicateLabel(self.raw_sentence, instance)
+
+                else:
+                    #add labels for argument spans
+                    self.addArgumentLabel(self.raw_sentence,instance)
+                    #add the predicate/roleset label
+                    self.addPredicateLabel(self.raw_sentence, instance)
+
+                    self.saveAnnotatedSentence(self.raw_sentence)
+                    #clear all variables
+                    self.x = 0
+                    self.raw_sentence = []
+
+                    #set x to 0 if we have a new file
+                    if(next_instance.fileid != instance.fileid):
+                        x = 0
+                        raw_sentence = []
+
+            #All predicates arguments in a sentence, multiple identical sentences different annotations
+            elif(self.mode == 2):
+                print "mode 2"
+            else:
+                print "mode does not exist"
+
 
 
 if __name__ == "__main__":
